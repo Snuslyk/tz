@@ -1,0 +1,49 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  consumer-service:
+    build:
+      context: .
+      dockerfile: apps/consumer-service/Dockerfile
+    container_name: consumer-service
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  producer-service:
+    build:
+      context: .
+      dockerfile: apps/producer-service/Dockerfile
+    container_name: producer-service
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      PORT: 4242
+    ports:
+      - "4242:4242"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      consumer-service:
+        condition: service_started
